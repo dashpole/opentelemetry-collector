@@ -23,7 +23,8 @@ FAIL_COLOR=$(printf "\033[31mFAIL\033[0m")
 TEST_COLORIZE="${SED} 's/PASS/${PASS_COLOR}/' | ${SED} 's/FAIL/${FAIL_COLOR}/'"
 echo ${TEST_ARGS}
 mkdir -p results
-TESTBED_CONFIG=inprocess.yaml go test -v ${TEST_ARGS} 2>&1 | tee results/testoutput.log | bash -c "${TEST_COLORIZE}"
+TESTBED_CONFIG=${TESTBED_CONFIG-inprocess.yaml}
+go test -v ${TEST_ARGS} 2>&1 | tee results/testoutput.log | bash -c "${TEST_COLORIZE}"
 
 testStatus=${PIPESTATUS[0]}
 

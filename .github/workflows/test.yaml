@@ -1,0 +1,29 @@
+name: Test
+
+on: [push]
+
+jobs:
+  correctness:
+    runs-on: ubuntu-20.04
+    timeout-minutes: 30
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: '1.15'
+    - name: Install fluentbit
+      run: |
+        sudo chmod 0777 -R /opt
+        sudo ln -s /opt/td-agent-bit/bin/td-agent-bit /usr/local/bin/fluent-bit
+        wget https://packages.fluentbit.io/ubuntu/bionic/pool/main/t/td-agent-bit/td-agent-bit_1.5.3_amd64.deb
+        sudo dpkg -i ./td-agent-bit*.deb
+    - name: Install Tools
+      run: make install-tools
+    - name: Build
+      run: make otelcol
+    - name: Correctness
+      uses: ./
+      env:
+        TESTBED_CONFIG: testbed/tests/local.yaml

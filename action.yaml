@@ -1,0 +1,7 @@
+name: 'Correctness'
+description: 'Collector correctness test'
+runs:
+  using: 'composite'
+  steps:
+    - run: cd /${GITHUB_WORKSPACE-.}/${UPSTREAM_DIRECTORY}/testbed/tests && TESTBED_CONFIG=${GITHUB_WORKSPACE-.}/${WORKING_DIRECTORY}/${TESTBED_CONFIG} ./runtests.sh
+      shell: bash
