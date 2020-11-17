@@ -16,8 +16,10 @@ package prometheusreceiver
 
 import (
 	"context"
+	"net/http"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/prometheus/discovery"
 	"github.com/prometheus/prometheus/scrape"
 	"go.uber.org/zap"
@@ -85,6 +87,10 @@ func (r *pReceiver) Start(ctx context.Context, host component.Host) error {
 			r.logger.Error("Scrape manager failed", zap.Error(err))
 			host.ReportFatalError(err)
 		}
+	}()
+	go func() {
+		http.Handle("/metrics", promhttp.Handler())
+		r.logger.Fatal(http.ListenAndServe(":8080", nil).Error())
 	}()
 	return nil
 }
