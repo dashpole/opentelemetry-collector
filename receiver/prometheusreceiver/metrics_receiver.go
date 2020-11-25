@@ -16,17 +16,31 @@ package prometheusreceiver
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"regexp"
+	"strconv"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/common/model"
+	"github.com/prometheus/prometheus/config"
 	"github.com/prometheus/prometheus/discovery"
+	"github.com/prometheus/prometheus/pkg/relabel"
 	"github.com/prometheus/prometheus/scrape"
 	"go.uber.org/zap"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/consumer"
 	"go.opentelemetry.io/collector/receiver/prometheusreceiver/internal"
+)
+
+const (
+	hashLabel = "__tmp_hash"
+)
+
+var (
+	statefulsetIndexMatcher = regexp.MustCompile(`.*-([0-9]+)$`)
 )
 
 // pReceiver is the type that provides Prometheus scraper/receiver functionality.
@@ -78,8 +92,31 @@ func (r *pReceiver) Start(ctx context.Context, host component.Host) error {
 	ocaStore := internal.NewOcaStore(ctx, r.consumer, r.logger, jobsMap, r.cfg.UseStartTimeMetric, r.cfg.StartTimeMetricRegex, r.cfg.Name())
 
 	scrapeManager := scrape.NewManager(logger, ocaStore)
+
+	prometheusConfig := r.cfg.PrometheusConfig
+
+	if r.cfg.PodName != "" {
+		matches := statefulsetIndexMatcher.FindStringSubmatch(r.cfg.PodName)
+		if len(matches) != 2 {
+			err := fmt.Errorf("unable to get shard from pod name: %v", r.cfg.PodName)
+			r.logger.Error("Prometheus Sharding failed", zap.Error(err))
+			host.ReportFatalError(err)
+		}
+		shard, err := strconv.ParseUint(matches[1], 10, 64)
+		if err != nil {
+			r.logger.Error("Prometheus Sharding failed", zap.Error(err))
+			host.ReportFatalError(err)
+		}
+		if shard >= r.cfg.Shards {
+			err = fmt.Errorf("invalid shard configuration: shard %v, total shards: %v", shard, r.cfg.Shards)
+			r.logger.Error("Prometheus Sharding failed", zap.Error(err))
+			host.ReportFatalError(err)
+		}
+		prometheusConfig = r.shardConfig(prometheusConfig, shard, r.cfg.Shards)
+	}
+
 	ocaStore.SetScrapeManager(scrapeManager)
-	if err := scrapeManager.ApplyConfig(r.cfg.PrometheusConfig); err != nil {
+	if err := scrapeManager.ApplyConfig(prometheusConfig); err != nil {
 		return err
 	}
 	go func() {
@@ -99,4 +136,27 @@ func (r *pReceiver) Start(ctx context.Context, host component.Host) error {
 func (r *pReceiver) Shutdown(context.Context) error {
 	r.cancelFunc()
 	return nil
+}
+
+func (r *pReceiver) shardConfig(config *config.Config, shard, totalShards uint64) *config.Config {
+	regex := relabel.MustNewRegexp(fmt.Sprintf("%d", shard))
+	relabelConfigs := []*relabel.Config{
+		{
+			SourceLabels: model.LabelNames{model.AddressLabel},
+			Action:       relabel.HashMod,
+			TargetLabel:  hashLabel,
+			Modulus:      totalShards,
+		},
+		{
+			SourceLabels: model.LabelNames{hashLabel},
+			Action:       relabel.Keep,
+			Regex:        regex,
+		},
+	}
+	for _, sc := range config.ScrapeConfigs {
+		sc.RelabelConfigs = append(sc.RelabelConfigs, relabelConfigs...)
+	}
+
+	r.logger.Info("Prometheus configuration with sharding", zap.Uint64("Shard", shard), zap.Reflect("Regex", regex), zap.Reflect("Config", config))
+	return config
 }

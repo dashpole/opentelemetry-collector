@@ -30,6 +30,8 @@ type Config struct {
 	BufferCount                   int            `mapstructure:"buffer_count"`
 	UseStartTimeMetric            bool           `mapstructure:"use_start_time_metric"`
 	StartTimeMetricRegex          string         `mapstructure:"start_time_metric_regex"`
+	PodName                       string         `mapstructure:"pod_name"`
+	Shards                        uint64         `mapstructure:"shards"`
 
 	// ConfigPlaceholder is just an entry to make the configuration pass a check
 	// that requires that all keys present in the config actually exist on the
