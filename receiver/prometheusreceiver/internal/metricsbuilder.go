@@ -34,7 +34,6 @@ const (
 	metricsSuffixBucket = "_bucket"
 	metricsSuffixSum    = "_sum"
 	startTimeMetricName = "process_start_time_seconds"
-	scrapeUpMetricName  = "up"
 )
 
 var (
@@ -97,20 +96,6 @@ func (b *metricBuilder) AddDataPoint(ls labels.Labels, t int64, v float64) error
 		b.hasInternalMetric = true
 		lm := ls.Map()
 		delete(lm, model.MetricNameLabel)
-		// See https://www.prometheus.io/docs/concepts/jobs_instances/#automatically-generated-labels-and-time-series
-		// up: 1 if the instance is healthy, i.e. reachable, or 0 if the scrape failed.
-		if metricName == scrapeUpMetricName && v != 1.0 {
-			if v == 0.0 {
-				b.logger.Warn("Failed to scrape Prometheus endpoint",
-					zap.Int64("scrape_timestamp", t),
-					zap.String("target_labels", fmt.Sprintf("%v", lm)))
-			} else {
-				b.logger.Warn("The 'up' metric contains invalid value",
-					zap.Float64("value", v),
-					zap.Int64("scrape_timestamp", t),
-					zap.String("target_labels", fmt.Sprintf("%v", lm)))
-			}
-		}
 		return nil
 	case b.useStartTimeMetric && b.matchStartTimeMetric(metricName):
 		b.startTime = v
@@ -237,7 +222,7 @@ func convToOCAMetricType(metricType textparse.MetricType) metricspb.MetricDescri
 		return metricspb.MetricDescriptor_SUMMARY
 	default:
 		// including: textparse.MetricTypeInfo, textparse.MetricTypeStateset
-		return metricspb.MetricDescriptor_UNSPECIFIED
+		return metricspb.MetricDescriptor_GAUGE_DOUBLE
 	}
 }
 
@@ -296,8 +281,5 @@ func timestampFromMs(timeAtMs int64) *timestamppb.Timestamp {
 }
 
 func isInternalMetric(metricName string) bool {
-	if metricName == scrapeUpMetricName || strings.HasPrefix(metricName, "scrape_") {
-		return true
-	}
-	return false
+	return strings.HasPrefix(metricName, "scrape_")
 }
