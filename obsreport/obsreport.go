@@ -86,7 +86,7 @@ func buildComponentPrefix(componentPrefix, configType string) string {
 // AllViews return the list of all views that needs to be configured.
 func AllViews() (views []*view.View) {
 	// Receiver views.
-	measures := []*stats.Int64Measure{
+	measures := []stats.Measure{
 		mReceiverAcceptedSpans,
 		mReceiverRefusedSpans,
 		mReceiverAcceptedMetricPoints,
@@ -100,15 +100,25 @@ func AllViews() (views []*view.View) {
 	views = append(views, genViews(measures, tagKeys, view.Sum())...)
 
 	// Scraper views.
-	measures = []*stats.Int64Measure{
+	measures = []stats.Measure{
 		mScraperScrapedMetricPoints,
 		mScraperErroredMetricPoints,
 	}
 	tagKeys = []tag.Key{tagKeyReceiver, tagKeyScraper}
 	views = append(views, genViews(measures, tagKeys, view.Sum())...)
 
+	// Exporter duration views.
+	// TODO: Add the same thing for processors and receivers
+	measures = []stats.Measure{
+		mExporterSpanSendDuration,
+		mExporterMetricSendDuration,
+		mExporterLogSendDuration,
+	}
+	tagKeys = []tag.Key{tagKeyExporter}
+	views = append(views, genViews(measures, tagKeys, view.Distribution(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1))...)
+
 	// Exporter views.
-	measures = []*stats.Int64Measure{
+	measures = []stats.Measure{
 		mExporterSentSpans,
 		mExporterFailedToSendSpans,
 		mExporterSentMetricPoints,
@@ -120,7 +130,7 @@ func AllViews() (views []*view.View) {
 	views = append(views, genViews(measures, tagKeys, view.Sum())...)
 
 	// Processor views.
-	measures = []*stats.Int64Measure{
+	measures = []stats.Measure{
 		mProcessorAcceptedSpans,
 		mProcessorRefusedSpans,
 		mProcessorDroppedSpans,
@@ -138,7 +148,7 @@ func AllViews() (views []*view.View) {
 }
 
 func genViews(
-	measures []*stats.Int64Measure,
+	measures []stats.Measure,
 	tagKeys []tag.Key,
 	aggregation *view.Aggregation,
 ) []*view.View {

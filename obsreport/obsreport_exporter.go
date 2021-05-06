@@ -16,6 +16,7 @@ package obsreport
 
 import (
 	"context"
+	"time"
 
 	"go.opencensus.io/stats"
 	"go.opencensus.io/tag"
@@ -32,16 +33,22 @@ const (
 	SentSpansKey = "sent_spans"
 	// FailedToSendSpansKey used to track spans that failed to be sent by exporters.
 	FailedToSendSpansKey = "send_failed_spans"
+	// SpanSendDurationKey used to track duration of sending spans.
+	SpanSendDurationKey = "span_send_duration"
 
 	// SentMetricPointsKey used to track metric points sent by exporters.
 	SentMetricPointsKey = "sent_metric_points"
 	// FailedToSendMetricPointsKey used to track metric points that failed to be sent by exporters.
 	FailedToSendMetricPointsKey = "send_failed_metric_points"
+	// MetricSendDurationKey used to track duration of sending metrics.
+	MetricSendDurationKey = "metric_send_duration"
 
 	// SentLogRecordsKey used to track logs sent by exporters.
 	SentLogRecordsKey = "sent_log_records"
 	// FailedToSendLogRecordsKey used to track logs that failed to be sent by exporters.
 	FailedToSendLogRecordsKey = "send_failed_log_records"
+	// LogSendDurationKey used to track duration of sending logs.
+	LogSendDurationKey = "log_send_duration"
 )
 
 var (
@@ -65,6 +72,10 @@ var (
 		exporterPrefix+FailedToSendSpansKey,
 		"Number of spans in failed attempts to send to destination.",
 		stats.UnitDimensionless)
+	mExporterSpanSendDuration = stats.Float64(
+		exporterPrefix+SpanSendDurationKey,
+		"Duration of sending spans.",
+		stats.UnitSeconds)
 	mExporterSentMetricPoints = stats.Int64(
 		exporterPrefix+SentMetricPointsKey,
 		"Number of metric points successfully sent to destination.",
@@ -73,6 +84,10 @@ var (
 		exporterPrefix+FailedToSendMetricPointsKey,
 		"Number of metric points in failed attempts to send to destination.",
 		stats.UnitDimensionless)
+	mExporterMetricSendDuration = stats.Float64(
+		exporterPrefix+MetricSendDurationKey,
+		"Duration of sending metrics.",
+		stats.UnitSeconds)
 	mExporterSentLogRecords = stats.Int64(
 		exporterPrefix+SentLogRecordsKey,
 		"Number of log record successfully sent to destination.",
@@ -81,6 +96,10 @@ var (
 		exporterPrefix+FailedToSendLogRecordsKey,
 		"Number of log records in failed attempts to send to destination.",
 		stats.UnitDimensionless)
+	mExporterLogSendDuration = stats.Float64(
+		exporterPrefix+LogSendDurationKey,
+		"Duration of sending logs.",
+		stats.UnitSeconds)
 )
 
 // Exporter is a helper to add observability to a component.Exporter.
@@ -106,17 +125,20 @@ func NewExporter(cfg ExporterSettings) *Exporter {
 	}
 }
 
+type startContextKey struct{}
+
 // StartTracesExportOp is called at the start of an Export operation.
 // The returned context should be used in other calls to the Exporter functions
 // dealing with the same export operation.
 func (eor *Exporter) StartTracesExportOp(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, startContextKey{}, time.Now())
 	return eor.startSpan(ctx, exportTraceDataOperationSuffix)
 }
 
 // EndTracesExportOp completes the export operation that was started with StartTracesExportOp.
 func (eor *Exporter) EndTracesExportOp(ctx context.Context, numSpans int, err error) {
 	numSent, numFailedToSend := toNumItems(numSpans, err)
-	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterSentSpans, mExporterFailedToSendSpans)
+	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterSpanSendDuration, mExporterSentSpans, mExporterFailedToSendSpans)
 	endSpan(ctx, err, numSent, numFailedToSend, SentSpansKey, FailedToSendSpansKey)
 }
 
@@ -124,6 +146,7 @@ func (eor *Exporter) EndTracesExportOp(ctx context.Context, numSpans int, err er
 // The returned context should be used in other calls to the Exporter functions
 // dealing with the same export operation.
 func (eor *Exporter) StartMetricsExportOp(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, startContextKey{}, time.Now())
 	return eor.startSpan(ctx, exportMetricsOperationSuffix)
 }
 
@@ -131,7 +154,7 @@ func (eor *Exporter) StartMetricsExportOp(ctx context.Context) context.Context {
 // StartMetricsExportOp.
 func (eor *Exporter) EndMetricsExportOp(ctx context.Context, numMetricPoints int, err error) {
 	numSent, numFailedToSend := toNumItems(numMetricPoints, err)
-	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterSentMetricPoints, mExporterFailedToSendMetricPoints)
+	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterMetricSendDuration, mExporterSentMetricPoints, mExporterFailedToSendMetricPoints)
 	endSpan(ctx, err, numSent, numFailedToSend, SentMetricPointsKey, FailedToSendMetricPointsKey)
 }
 
@@ -139,13 +162,14 @@ func (eor *Exporter) EndMetricsExportOp(ctx context.Context, numMetricPoints int
 // The returned context should be used in other calls to the Exporter functions
 // dealing with the same export operation.
 func (eor *Exporter) StartLogsExportOp(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, startContextKey{}, time.Now())
 	return eor.startSpan(ctx, exportLogsOperationSuffix)
 }
 
 // EndLogsExportOp completes the export operation that was started with StartLogsExportOp.
 func (eor *Exporter) EndLogsExportOp(ctx context.Context, numLogRecords int, err error) {
 	numSent, numFailedToSend := toNumItems(numLogRecords, err)
-	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterSentLogRecords, mExporterFailedToSendLogRecords)
+	eor.recordMetrics(ctx, numSent, numFailedToSend, mExporterLogSendDuration, mExporterSentLogRecords, mExporterFailedToSendLogRecords)
 	endSpan(ctx, err, numSent, numFailedToSend, SentLogRecordsKey, FailedToSendLogRecordsKey)
 }
 
@@ -157,7 +181,7 @@ func (eor *Exporter) startSpan(ctx context.Context, operationSuffix string) cont
 	return ctx
 }
 
-func (eor *Exporter) recordMetrics(ctx context.Context, numSent, numFailedToSend int64, sentMeasure, failedToSendMeasure *stats.Int64Measure) {
+func (eor *Exporter) recordMetrics(ctx context.Context, numSent, numFailedToSend int64, durationMeasure *stats.Float64Measure, sentMeasure, failedToSendMeasure *stats.Int64Measure) {
 	if gLevel == configtelemetry.LevelNone {
 		return
 	}
@@ -167,6 +191,15 @@ func (eor *Exporter) recordMetrics(ctx context.Context, numSent, numFailedToSend
 		eor.mutators,
 		sentMeasure.M(numSent),
 		failedToSendMeasure.M(numFailedToSend))
+
+	startTime, _ := ctx.Value(startContextKey{}).(time.Time)
+	if startTime.IsZero() {
+		return
+	}
+	stats.RecordWithTags(
+		ctx,
+		eor.mutators,
+		durationMeasure.M(time.Since(startTime).Seconds()))
 }
 
 func endSpan(ctx context.Context, err error, numSent, numFailedToSend int64, sentItemsKey, failedToSendItemsKey string) {
