@@ -134,6 +134,15 @@ func AllViews() (views []*view.View) {
 	tagKeys = []tag.Key{tagKeyProcessor}
 	views = append(views, genViews(measures, tagKeys, view.Sum())...)
 
+	// Pipeline views.
+	views = append(views, &view.View{
+		Name:        mPipelineMetricLatencyMetrics.Name(),
+		Description: mPipelineMetricLatencyMetrics.Description(),
+		TagKeys:     []tag.Key{tagKeyPipeline},
+		Measure:     mPipelineMetricLatencyMetrics,
+		Aggregation: view.Distribution(0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1),
+	})
+
 	return views
 }
 

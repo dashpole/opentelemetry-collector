@@ -15,6 +15,8 @@
 package pdata
 
 import (
+	"time"
+
 	"go.opentelemetry.io/collector/internal"
 	otlpcollectormetrics "go.opentelemetry.io/collector/internal/data/protogen/collector/metrics/v1"
 	otlpmetrics "go.opentelemetry.io/collector/internal/data/protogen/metrics/v1"
@@ -44,12 +46,18 @@ func (at AggregationTemporality) String() string {
 // Outside of the core repository the metrics pipeline cannot be converted to the new model since data.MetricData is
 // part of the internal package.
 type Metrics struct {
-	orig *otlpcollectormetrics.ExportMetricsServiceRequest
+	orig         *otlpcollectormetrics.ExportMetricsServiceRequest
+	creationTime time.Time
 }
 
 // NewMetrics creates a new Metrics.
 func NewMetrics() Metrics {
-	return Metrics{orig: &otlpcollectormetrics.ExportMetricsServiceRequest{}}
+	return Metrics{orig: &otlpcollectormetrics.ExportMetricsServiceRequest{}, creationTime: time.Now()}
+}
+
+// NewMetricsCreatedAt instantiates a new metrics that was previously created.
+func NewMetricsCreatedAt(creation time.Time) Metrics {
+	return Metrics{orig: &otlpcollectormetrics.ExportMetricsServiceRequest{}, creationTime: creation}
 }
 
 // MetricsFromInternalRep creates Metrics from the internal representation.
@@ -76,6 +84,10 @@ func (md Metrics) InternalRep() internal.MetricsWrapper {
 	return internal.MetricsFromOtlp(md.orig)
 }
 
+func (md Metrics) CreationTime() time.Time {
+	return md.creationTime
+}
+
 // ToOtlpProtoBytes converts this Metrics to the OTLP Collector ExportMetricsServiceRequest
 // ProtoBuf bytes.
 //
@@ -88,6 +100,7 @@ func (md Metrics) ToOtlpProtoBytes() ([]byte, error) {
 func (md Metrics) Clone() Metrics {
 	cloneMd := NewMetrics()
 	md.ResourceMetrics().CopyTo(cloneMd.ResourceMetrics())
+	cloneMd.creationTime = md.creationTime
 	return cloneMd
 }
 

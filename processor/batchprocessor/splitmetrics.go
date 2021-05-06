@@ -24,7 +24,7 @@ func splitMetrics(size int, toSplit pdata.Metrics) pdata.Metrics {
 		return toSplit
 	}
 	copiedMetrics := 0
-	result := pdata.NewMetrics()
+	result := pdata.NewMetricsCreatedAt(toSplit.CreationTime())
 	result.ResourceMetrics().Resize(toSplit.ResourceMetrics().Len())
 	rms := toSplit.ResourceMetrics()
 

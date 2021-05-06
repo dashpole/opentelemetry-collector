@@ -313,6 +313,7 @@ func (bm *batchMetrics) size() int {
 
 // resets the current batchMetrics structure with zero/empty values.
 func (bm *batchMetrics) reset() {
+	// TODO handle creationTime for batches?
 	bm.metricData = pdata.NewMetrics()
 	bm.metricCount = 0
 }

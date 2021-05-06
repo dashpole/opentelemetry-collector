@@ -50,7 +50,7 @@ func (idx metricIndex) add(rmIdx, ilmIdx, mIdx int) {
 }
 
 func (idx metricIndex) extract(pdm pdata.Metrics) pdata.Metrics {
-	out := pdata.NewMetrics()
+	out := pdata.NewMetricsCreatedAt(pdm.CreationTime())
 	rmSliceOut := out.ResourceMetrics()
 
 	sortRMIdx := sortRM(idx.m)

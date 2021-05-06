@@ -71,7 +71,9 @@ func (mexp *metricsExporter) ConsumeMetrics(ctx context.Context, md pdata.Metric
 	if mexp.baseExporter.convertResourceToTelemetry {
 		md = convertResourceToLabels(md)
 	}
-	return mexp.sender.send(newMetricsRequest(ctx, md, mexp.pusher))
+	err := mexp.sender.send(newMetricsRequest(ctx, md, mexp.pusher))
+	obsreport.RecordPipelineDuration(ctx, md)
+	return err
 }
 
 // NewMetricsExporter creates an MetricsExporter that records observability metrics and wraps every request with a Span.
