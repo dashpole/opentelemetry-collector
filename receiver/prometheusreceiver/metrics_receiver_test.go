@@ -1263,7 +1263,8 @@ process_start_time_seconds 400.8
 
 var startTimeMetricPageStartTimestamp = &timestamppb.Timestamp{Seconds: 400, Nanos: 800000000}
 
-const numStartTimeMetricPageTimeseries = 6
+// 6 metrics + 5 internal
+const numStartTimeMetricPageTimeseries = 11
 
 func verifyStartTimeMetricPage(t *testing.T, _ *testData, mds []*agentmetricspb.ExportMetricsServiceRequest) {
 	numTimeseries := 0
